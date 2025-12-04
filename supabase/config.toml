@@ -1,1 +1,4 @@
 project_id = "lfaxxfyfyxghdcjlokwn"
+
+[functions.cleanup-completed-tasks]
+verify_jwt = false

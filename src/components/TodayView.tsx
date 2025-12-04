@@ -80,6 +80,7 @@ export function TodayView({
                       key={task.id}
                       task={task}
                       horizon={horizon}
+                      horizons={horizons}
                       onToggleComplete={onToggleComplete}
                       onUpdate={onUpdateTask}
                       onDelete={onDeleteTask}
@@ -101,6 +102,7 @@ export function TodayView({
                     key={task.id}
                     task={task}
                     horizon={getHorizonForTask(task)}
+                    horizons={horizons}
                     showHorizonBadge
                     onToggleComplete={onToggleComplete}
                     onUpdate={onUpdateTask}

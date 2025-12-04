@@ -64,6 +64,8 @@ export function ConstellationView({
                     <div key={task.id} onClick={(e) => e.stopPropagation()}>
                       <TaskItem
                         task={task}
+                        horizon={horizon}
+                        horizons={horizons}
                         onToggleComplete={onToggleComplete}
                         onUpdate={onUpdateTask}
                         onDelete={onDeleteTask}
