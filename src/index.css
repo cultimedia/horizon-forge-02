@@ -6,43 +6,43 @@
 
 @layer base {
   :root {
-    --background: 220 20% 6%;
-    --foreground: 45 20% 90%;
+    --background: 220 25% 5%;
+    --foreground: 180 15% 88%;
 
-    --card: 220 18% 10%;
-    --card-foreground: 45 20% 90%;
+    --card: 215 25% 9%;
+    --card-foreground: 180 15% 88%;
 
-    --popover: 220 18% 8%;
-    --popover-foreground: 45 20% 90%;
+    --popover: 215 25% 7%;
+    --popover-foreground: 180 15% 88%;
 
-    --primary: 38 70% 55%;
-    --primary-foreground: 220 20% 6%;
+    --primary: 175 65% 50%;
+    --primary-foreground: 220 25% 5%;
 
-    --secondary: 220 15% 15%;
-    --secondary-foreground: 45 15% 75%;
+    --secondary: 215 20% 14%;
+    --secondary-foreground: 180 12% 72%;
 
-    --muted: 220 15% 12%;
-    --muted-foreground: 45 10% 50%;
+    --muted: 215 20% 11%;
+    --muted-foreground: 180 8% 48%;
 
-    --accent: 38 50% 40%;
-    --accent-foreground: 45 20% 95%;
+    --accent: 175 45% 35%;
+    --accent-foreground: 180 15% 95%;
 
     --destructive: 0 62% 50%;
-    --destructive-foreground: 45 20% 95%;
+    --destructive-foreground: 180 15% 95%;
 
-    --border: 220 15% 18%;
-    --input: 220 15% 15%;
-    --ring: 38 70% 55%;
+    --border: 215 18% 16%;
+    --input: 215 20% 14%;
+    --ring: 175 65% 50%;
 
     --radius: 0.5rem;
 
     /* Custom tokens */
-    --star: 38 70% 55%;
-    --star-glow: 38 80% 65%;
-    --constellation: 220 30% 25%;
-    --overdue: 15 60% 50%;
-    --completed: 45 10% 35%;
-    --horizon-badge: 220 20% 20%;
+    --star: 175 70% 52%;
+    --star-glow: 175 80% 62%;
+    --constellation: 200 30% 22%;
+    --overdue: 20 55% 55%;
+    --completed: 180 8% 35%;
+    --horizon-badge: 200 22% 18%;
 
     /* Gradients */
     --gradient-night: linear-gradient(180deg, hsl(220 20% 6%) 0%, hsl(220 25% 8%) 100%);
@@ -50,9 +50,9 @@
     --gradient-glow: radial-gradient(ellipse at center, hsl(38 70% 55% / 0.15) 0%, transparent 70%);
 
     /* Shadows */
-    --shadow-star: 0 0 20px hsl(38 70% 55% / 0.3);
-    --shadow-card: 0 4px 24px hsl(220 30% 5% / 0.5);
-    --shadow-subtle: 0 2px 8px hsl(220 30% 5% / 0.3);
+    --shadow-star: 0 0 20px hsl(175 70% 52% / 0.35);
+    --shadow-card: 0 4px 24px hsl(220 30% 3% / 0.6);
+    --shadow-subtle: 0 2px 8px hsl(220 30% 3% / 0.4);
 
     /* Typography */
     --font-display: 'Cormorant Garamond', Georgia, serif;
@@ -150,8 +150,8 @@
 }
 
 @keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 20px hsl(38 70% 55% / 0.3); }
-  50% { box-shadow: 0 0 30px hsl(38 70% 55% / 0.5); }
+  0%, 100% { box-shadow: 0 0 20px hsl(175 70% 52% / 0.35); }
+  50% { box-shadow: 0 0 30px hsl(175 70% 52% / 0.5); }
 }
 
 @keyframes slideIn {
