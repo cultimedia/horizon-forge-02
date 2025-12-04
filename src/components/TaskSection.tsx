@@ -69,6 +69,7 @@ export function TaskSection({
               <TaskItem
                 task={task}
                 horizon={getHorizonForTask(task)}
+                horizons={horizons}
                 showHorizonBadge={showHorizonBadge}
                 onToggleComplete={onToggleComplete}
                 onUpdate={onUpdateTask}
@@ -87,6 +88,7 @@ export function TaskSection({
                   key={task.id}
                   task={task}
                   horizon={getHorizonForTask(task)}
+                  horizons={horizons}
                   showHorizonBadge={showHorizonBadge}
                   onToggleComplete={onToggleComplete}
                   onUpdate={onUpdateTask}

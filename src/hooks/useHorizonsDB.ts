@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { parseDateFromText, getTimeframeFromDate } from '@/utils/dateParser';
 
 export type Timeframe = 'today' | 'week' | 'backlog';
 export type ViewMode = 'horizon' | 'constellation' | 'today';
@@ -37,6 +38,7 @@ export function useHorizonsDB() {
   const [activeHorizonId, setActiveHorizonId] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('horizon');
   const [isLoaded, setIsLoaded] = useState(false);
+  const lastUsedHorizonRef = useRef<string>('');
 
   // Fetch horizons
   const fetchHorizons = useCallback(async () => {
@@ -92,12 +94,54 @@ export function useHorizonsDB() {
     setTasks(filtered);
   }, [user]);
 
-  // Initial load
+  // Initial load and real-time subscriptions
   useEffect(() => {
     if (user) {
       Promise.all([fetchHorizons(), fetchTasks()]).then(() => {
         setIsLoaded(true);
       });
+
+      // Set up real-time subscriptions
+      const tasksChannel = supabase
+        .channel('tasks-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'tasks' },
+          (payload) => {
+            if (payload.eventType === 'INSERT') {
+              const newTask = { ...payload.new, timeframe: payload.new.timeframe as Timeframe } as Task;
+              setTasks(prev => [...prev.filter(t => t.id !== newTask.id), newTask]);
+            } else if (payload.eventType === 'UPDATE') {
+              const updatedTask = { ...payload.new, timeframe: payload.new.timeframe as Timeframe } as Task;
+              setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+            } else if (payload.eventType === 'DELETE') {
+              setTasks(prev => prev.filter(t => t.id !== payload.old.id));
+            }
+          }
+        )
+        .subscribe();
+
+      const horizonsChannel = supabase
+        .channel('horizons-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'horizons' },
+          (payload) => {
+            if (payload.eventType === 'INSERT') {
+              setHorizons(prev => [...prev, payload.new as Horizon]);
+            } else if (payload.eventType === 'UPDATE') {
+              setHorizons(prev => prev.map(h => h.id === payload.new.id ? payload.new as Horizon : h));
+            } else if (payload.eventType === 'DELETE') {
+              setHorizons(prev => prev.filter(h => h.id !== payload.old.id));
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(tasksChannel);
+        supabase.removeChannel(horizonsChannel);
+      };
     }
   }, [user, fetchHorizons, fetchTasks]);
 
@@ -186,18 +230,21 @@ export function useHorizonsDB() {
     }
   }, [activeHorizonId, horizons, updateHorizon]);
 
-  const addTask = useCallback(async (title: string, horizonId?: string, timeframe: Timeframe = 'today') => {
+  const addTask = useCallback(async (title: string, horizonId?: string, timeframe?: Timeframe) => {
     if (!user) return null;
 
-    let finalHorizonId = horizonId || activeHorizonId;
+    let finalHorizonId = horizonId || lastUsedHorizonRef.current || activeHorizonId;
     let finalTitle = title;
+    let dueDate: string | null = null;
+    let finalTimeframe: Timeframe = timeframe || 'today';
 
-    // Parse #HorizonName prefix
+    // Parse #HorizonName prefix (fuzzy match)
     const prefixMatch = title.match(/^#(\S+)\s+(.+)/);
     if (prefixMatch) {
       const horizonName = prefixMatch[1].toLowerCase();
       const matchedHorizon = horizons.find(h =>
         h.name.toLowerCase().replace(/\s+/g, '') === horizonName ||
+        h.name.toLowerCase().replace(/\s+/g, '').includes(horizonName) ||
         h.name.toLowerCase().startsWith(horizonName)
       );
       if (matchedHorizon) {
@@ -206,13 +253,40 @@ export function useHorizonsDB() {
       }
     }
 
+    // Parse natural language dates
+    const { date, remainingText } = parseDateFromText(finalTitle);
+    if (date) {
+      dueDate = date.toISOString();
+      finalTitle = remainingText;
+      finalTimeframe = getTimeframeFromDate(date);
+    }
+
+    // Remember last used horizon
+    lastUsedHorizonRef.current = finalHorizonId;
+
+    // Optimistic update
+    const optimisticTask: Task = {
+      id: crypto.randomUUID(),
+      horizon_id: finalHorizonId,
+      title: finalTitle,
+      timeframe: finalTimeframe,
+      due_date: dueDate,
+      completed: false,
+      completed_at: null,
+      notes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setTasks(prev => [...prev, optimisticTask]);
+
     const { data, error } = await supabase
       .from('tasks')
       .insert({
         user_id: user.id,
         horizon_id: finalHorizonId,
         title: finalTitle,
-        timeframe,
+        timeframe: finalTimeframe,
+        due_date: dueDate,
       })
       .select()
       .single();
@@ -220,28 +294,42 @@ export function useHorizonsDB() {
     if (error) {
       console.error('Error adding task:', error);
       toast.error('Failed to create task');
+      // Rollback optimistic update
+      setTasks(prev => prev.filter(t => t.id !== optimisticTask.id));
       return null;
     }
 
+    // Replace optimistic task with real one
     const typedTask = { ...data, timeframe: data.timeframe as Timeframe };
-    setTasks(prev => [...prev, typedTask]);
+    setTasks(prev => prev.map(t => t.id === optimisticTask.id ? typedTask : t));
     return typedTask;
   }, [user, activeHorizonId, horizons]);
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
+    // If due_date is being updated, recalculate timeframe
+    const finalUpdates = { ...updates };
+    if (updates.due_date !== undefined) {
+      const dueDate = updates.due_date ? new Date(updates.due_date) : null;
+      finalUpdates.timeframe = getTimeframeFromDate(dueDate);
+    }
+
+    // Optimistic update
+    const previousTasks = tasks;
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...finalUpdates } : t));
+
     const { error } = await supabase
       .from('tasks')
-      .update(updates)
+      .update(finalUpdates)
       .eq('id', id);
 
     if (error) {
       console.error('Error updating task:', error);
       toast.error('Failed to update task');
+      // Rollback
+      setTasks(previousTasks);
       return;
     }
-
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-  }, []);
+  }, [tasks]);
 
   const toggleTaskComplete = useCallback(async (id: string) => {
     const task = tasks.find(t => t.id === id);
