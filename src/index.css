@@ -15,7 +15,7 @@
     --popover: 215 25% 7%;
     --popover-foreground: 180 15% 88%;
 
-    --primary: 175 65% 50%;
+    --primary: 182 65% 48%;
     --primary-foreground: 220 25% 5%;
 
     --secondary: 215 20% 14%;
@@ -24,21 +24,21 @@
     --muted: 215 20% 11%;
     --muted-foreground: 180 8% 48%;
 
-    --accent: 175 45% 35%;
-    --accent-foreground: 180 15% 95%;
+    --accent: 182 45% 35%;
+    --accent-foreground: 185 15% 95%;
 
     --destructive: 0 62% 50%;
     --destructive-foreground: 180 15% 95%;
 
     --border: 215 18% 16%;
     --input: 215 20% 14%;
-    --ring: 175 65% 50%;
+    --ring: 182 65% 48%;
 
     --radius: 0.5rem;
 
     /* Custom tokens */
-    --star: 175 70% 52%;
-    --star-glow: 175 80% 62%;
+    --star: 182 68% 50%;
+    --star-glow: 182 75% 60%;
     --constellation: 200 30% 22%;
     --overdue: 20 55% 55%;
     --completed: 180 8% 35%;
@@ -50,7 +50,7 @@
     --gradient-glow: radial-gradient(ellipse at center, hsl(38 70% 55% / 0.15) 0%, transparent 70%);
 
     /* Shadows */
-    --shadow-star: 0 0 20px hsl(175 70% 52% / 0.35);
+    --shadow-star: 0 0 20px hsl(182 68% 50% / 0.35);
     --shadow-card: 0 4px 24px hsl(220 30% 3% / 0.6);
     --shadow-subtle: 0 2px 8px hsl(220 30% 3% / 0.4);
 
@@ -150,8 +150,8 @@
 }
 
 @keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 20px hsl(175 70% 52% / 0.35); }
-  50% { box-shadow: 0 0 30px hsl(175 70% 52% / 0.5); }
+  0%, 100% { box-shadow: 0 0 20px hsl(182 68% 50% / 0.35); }
+  50% { box-shadow: 0 0 30px hsl(182 68% 50% / 0.5); }
 }
 
 @keyframes slideIn {
