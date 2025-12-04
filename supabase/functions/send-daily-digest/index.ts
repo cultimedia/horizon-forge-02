@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
         );
 
         const emailResponse = await resend.emails.send({
-          from: 'Horizons <digest@ops.holyhell.io>',
+          from: 'Horizons <brief@ops.holyhell.io>',
           to: [userSetting.email_for_digest],
           subject: `Your 10am Brief - ${formatDate(new Date())}`,
           html: emailHTML,
