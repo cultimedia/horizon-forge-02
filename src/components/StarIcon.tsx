@@ -31,7 +31,7 @@ export function StarIcon({ className, active = false, size = 'md' }: StarIconPro
         fill="currentColor"
         className={cn(
           'transition-all duration-300',
-          active && 'drop-shadow-[0_0_8px_hsl(38,70%,55%)]'
+          active && 'drop-shadow-[0_0_8px_hsl(175,70%,52%)]'
         )}
       />
       {active && (
