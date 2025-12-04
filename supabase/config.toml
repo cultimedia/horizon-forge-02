@@ -2,3 +2,6 @@ project_id = "lfaxxfyfyxghdcjlokwn"
 
 [functions.cleanup-completed-tasks]
 verify_jwt = false
+
+[functions.send-daily-digest]
+verify_jwt = false
