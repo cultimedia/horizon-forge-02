@@ -6,7 +6,8 @@ import { HorizonView } from '@/components/HorizonView';
 import { ConstellationView } from '@/components/ConstellationView';
 import { TodayView } from '@/components/TodayView';
 import { Button } from '@/components/ui/button';
-import { LogOut } from 'lucide-react';
+import { LogOut, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 // Adapter types to match existing components
 interface Task {
@@ -116,15 +117,28 @@ const Index = () => {
               Architecture for the long game
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={signOut}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="text-primary border-primary/30 hover:bg-primary/10"
+            >
+              <Link to="/capture">
+                <Zap className="w-4 h-4 mr-2" />
+                Quick Capture
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={signOut}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign out
+            </Button>
+          </div>
         </div>
       </header>
 
