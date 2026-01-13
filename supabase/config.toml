@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.taskade-capture]
 verify_jwt = false
+
+[functions.ingest]
+verify_jwt = false
