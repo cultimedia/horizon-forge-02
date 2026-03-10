@@ -20,7 +20,8 @@ export function HorizonView({
 }: HorizonViewProps) {
   const todayTasks = tasks.filter(t => t.timeframe === 'today');
   const weekTasks = tasks.filter(t => t.timeframe === 'week');
-  const backlogTasks = tasks.filter(t => t.timeframe === 'backlog');
+  const laterTasks = tasks.filter(t => t.timeframe === 'backlog' && t.dueDate);
+  const backlogTasks = tasks.filter(t => t.timeframe === 'backlog' && !t.dueDate);
 
   return (
     <div className="space-y-8">
@@ -43,6 +44,18 @@ export function HorizonView({
         onUpdateTask={onUpdateTask}
         onDeleteTask={onDeleteTask}
       />
+
+      {laterTasks.length > 0 && (
+        <TaskSection
+          title="Later"
+          timeframe="backlog"
+          tasks={laterTasks}
+          horizons={horizons}
+          onToggleComplete={onToggleComplete}
+          onUpdateTask={onUpdateTask}
+          onDeleteTask={onDeleteTask}
+        />
+      )}
 
       <TaskSection
         title="Backlog"
