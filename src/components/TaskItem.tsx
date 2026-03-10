@@ -31,7 +31,7 @@ export function TaskItem({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showHorizonPicker, setShowHorizonPicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const clickTimeoutRef = useRef<NodeJS.Timeout>();
+  const clickTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !task.completed;
 
