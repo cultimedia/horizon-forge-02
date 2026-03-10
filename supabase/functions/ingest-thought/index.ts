@@ -133,36 +133,27 @@ Rules:
   }
 }
 
-// ── Horizon lookup ────────────────────────────────────────────────
-async function resolveHorizonId(
-  supabase: ReturnType<typeof createClient>,
-  userId: string,
-  horizonLabel: string
-): Promise<string | null> {
-  const labelMap: Record<string, string[]> = {
-    today: ["today", "daily", "now"],
-    this_week: ["week", "weekly", "this week"],
-    this_month: ["month", "monthly", "this month"],
-    someday: ["someday", "later", "backlog", "inbox"],
-  };
-  const candidates = labelMap[horizonLabel] ?? ["inbox"];
+// ── Horizon lookup by name ────────────────────────────────────────
+function resolveHorizonByName(
+  horizons: { id: string; name: string }[],
+  horizonName: string
+): string | null {
+  // Exact match first
+  const exact = horizons.find(
+    (h) => h.name.toLowerCase() === horizonName.toLowerCase()
+  );
+  if (exact) return exact.id;
 
-  const { data } = await supabase
-    .from("horizons")
-    .select("id, name")
-    .eq("user_id", userId)
-    .eq("is_active", true);
+  // Partial match
+  const partial = horizons.find(
+    (h) =>
+      h.name.toLowerCase().includes(horizonName.toLowerCase()) ||
+      horizonName.toLowerCase().includes(h.name.toLowerCase())
+  );
+  if (partial) return partial.id;
 
-  if (!data || data.length === 0) return null;
-
-  for (const candidate of candidates) {
-    const match = data.find((h: { id: string; name: string }) =>
-      h.name.toLowerCase().includes(candidate)
-    );
-    if (match) return match.id;
-  }
-
-  return data[0].id;
+  // Fallback to first horizon
+  return horizons[0]?.id ?? null;
 }
 
 // ── Main handler ──────────────────────────────────────────────────
