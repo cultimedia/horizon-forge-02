@@ -26,10 +26,10 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     let userId: string | null = null;
 
-    if (apiKey) {
+    if (effectiveApiKey) {
       // Machine/automation path
       const expectedApiKey = Deno.env.get('INGEST_API_KEY');
-      if (!expectedApiKey || apiKey !== expectedApiKey) {
+      if (!expectedApiKey || effectiveApiKey !== expectedApiKey) {
         return new Response(
           JSON.stringify({ ok: false, error: 'Unauthorized' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
