@@ -20,14 +20,16 @@ Deno.serve(async (req) => {
 
   try {
     // Support both authenticated (browser) and API key (automation) access
-    const apiKey = req.headers.get('X-API-Key') || req.headers.get('x-api-key');
+    const apiKey = req.headers.get('X-API-Key') || req.headers.get('x-api-key') || req.headers.get('x-ingest-key');
+    const urlKey = new URL(req.url).searchParams.get('key');
+    const effectiveApiKey = apiKey || urlKey;
     const authHeader = req.headers.get('Authorization');
     let userId: string | null = null;
 
-    if (apiKey) {
+    if (effectiveApiKey) {
       // Machine/automation path
       const expectedApiKey = Deno.env.get('INGEST_API_KEY');
-      if (!expectedApiKey || apiKey !== expectedApiKey) {
+      if (!expectedApiKey || effectiveApiKey !== expectedApiKey) {
         return new Response(
           JSON.stringify({ ok: false, error: 'Unauthorized' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
