@@ -178,6 +178,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Map classifier horizon labels to DB-allowed timeframe values
+    const timeframeMap: Record<string, string> = {
+      today: "today",
+      this_week: "week",
+      this_month: "backlog",
+      someday: "backlog",
+    };
+
     // Run embedding + classification in parallel
     const [embedding, classification] = await Promise.all([
       embed(content),
@@ -209,7 +217,7 @@ Deno.serve(async (req) => {
         remind_at: classification.remind_at ?? null,
         confidence: classification.confidence,
         notes: content,
-        timeframe: classification.horizon,
+        timeframe: timeframeMap[classification.horizon] ?? "today",
         completed: false,
       })
       .select()
