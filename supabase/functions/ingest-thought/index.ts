@@ -69,9 +69,19 @@ async function embed(text: string): Promise<number[]> {
 }
 
 // ── Classifier ────────────────────────────────────────────────────
-async function classify(content: string) {
+async function classify(content: string, horizons: { name: string; description: string | null }[]) {
   const today = new Date().toISOString().split("T")[0];
+  const horizonList = horizons
+    .map((h) => {
+      const desc = h.description ? ` — ${h.description}` : "";
+      return `- "${h.name}"${desc}`;
+    })
+    .join("\n");
+
   const prompt = `You are a thought classifier for a personal knowledge system. Today is ${today}.
+
+The user has these horizons (categories):
+${horizonList}
 
 Classify the following capture and extract structured metadata. Respond ONLY with valid JSON — no markdown, no explanation.
 
@@ -82,7 +92,8 @@ Respond with this exact shape:
   "type": "task|idea|person_note|appointment|reference",
   "confidence": 0.0-1.0,
   "title": "clean, concise title for this item",
-  "horizon": "today|this_week|this_month|someday",
+  "horizon_name": "exact name of the best-matching horizon from the list above",
+  "timeframe": "today|this_week|this_month|someday",
   "due_at": "ISO 8601 datetime or null",
   "remind_at": "ISO 8601 datetime or null",
   "metadata": {
@@ -99,6 +110,8 @@ Rules:
 - type=person_note if it's primarily about a person
 - type=idea if it's a thought, insight, or concept
 - type=reference if it's factual info to remember
+- horizon_name MUST be one of the exact horizon names listed above
+- Use the horizon descriptions to decide which horizon fits best (e.g. if people mentioned match a horizon's description, use that horizon)
 - Set remind_at only if the capture explicitly mentions wanting a reminder
 - Set due_at if any date/time is mentioned
 - confidence reflects how certain you are about the classification`;
@@ -111,7 +124,8 @@ Rules:
       type: "task",
       confidence: 0.5,
       title: content.slice(0, 100),
-      horizon: "someday",
+      horizon_name: horizons[0]?.name ?? "Inbox",
+      timeframe: "someday",
       due_at: null,
       remind_at: null,
       metadata: { people: [], tags: [], action_items: [], summary: content },
@@ -119,36 +133,27 @@ Rules:
   }
 }
 
-// ── Horizon lookup ────────────────────────────────────────────────
-async function resolveHorizonId(
-  supabase: ReturnType<typeof createClient>,
-  userId: string,
-  horizonLabel: string
-): Promise<string | null> {
-  const labelMap: Record<string, string[]> = {
-    today: ["today", "daily", "now"],
-    this_week: ["week", "weekly", "this week"],
-    this_month: ["month", "monthly", "this month"],
-    someday: ["someday", "later", "backlog", "inbox"],
-  };
-  const candidates = labelMap[horizonLabel] ?? ["inbox"];
+// ── Horizon lookup by name ────────────────────────────────────────
+function resolveHorizonByName(
+  horizons: { id: string; name: string }[],
+  horizonName: string
+): string | null {
+  // Exact match first
+  const exact = horizons.find(
+    (h) => h.name.toLowerCase() === horizonName.toLowerCase()
+  );
+  if (exact) return exact.id;
 
-  const { data } = await supabase
-    .from("horizons")
-    .select("id, name")
-    .eq("user_id", userId)
-    .eq("is_active", true);
+  // Partial match
+  const partial = horizons.find(
+    (h) =>
+      h.name.toLowerCase().includes(horizonName.toLowerCase()) ||
+      horizonName.toLowerCase().includes(h.name.toLowerCase())
+  );
+  if (partial) return partial.id;
 
-  if (!data || data.length === 0) return null;
-
-  for (const candidate of candidates) {
-    const match = data.find((h: { id: string; name: string }) =>
-      h.name.toLowerCase().includes(candidate)
-    );
-    if (match) return match.id;
-  }
-
-  return data[0].id;
+  // Fallback to first horizon
+  return horizons[0]?.id ?? null;
 }
 
 // ── Main handler ──────────────────────────────────────────────────
@@ -186,22 +191,27 @@ Deno.serve(async (req) => {
       someday: "backlog",
     };
 
-    // Run embedding + classification in parallel
-    const [embedding, classification] = await Promise.all([
-      embed(content),
-      classify(content),
-    ]);
-
+    // Fetch user's horizons first (needed for classification)
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const horizonId = await resolveHorizonId(
-      supabase,
-      userId,
-      classification.horizon
-    );
+    const { data: userHorizons } = await supabase
+      .from("horizons")
+      .select("id, name, description")
+      .eq("user_id", userId)
+      .eq("is_active", true);
+
+    const horizons = userHorizons ?? [];
+
+    // Run embedding + classification in parallel
+    const [embedding, classification] = await Promise.all([
+      embed(content),
+      classify(content, horizons.map((h) => ({ name: h.name, description: h.description }))),
+    ]);
+
+    const horizonId = resolveHorizonByName(horizons, classification.horizon_name);
 
     // Note: DB column is "due_date" not "due_at"
     const { data: task, error } = await supabase
@@ -217,7 +227,7 @@ Deno.serve(async (req) => {
         remind_at: classification.remind_at ?? null,
         confidence: classification.confidence,
         notes: content,
-        timeframe: timeframeMap[classification.horizon] ?? "today",
+        timeframe: timeframeMap[classification.timeframe] ?? "today",
         completed: false,
       })
       .select()
