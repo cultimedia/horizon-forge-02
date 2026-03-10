@@ -178,6 +178,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Map classifier horizon labels to DB-allowed timeframe values
+    const timeframeMap: Record<string, string> = {
+      today: "today",
+      this_week: "week",
+      this_month: "backlog",
+      someday: "backlog",
+    };
+
     // Run embedding + classification in parallel
     const [embedding, classification] = await Promise.all([
       embed(content),
