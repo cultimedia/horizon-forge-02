@@ -34,7 +34,12 @@ export default function Capture() {
         throw new Error(response.error.message || 'Failed to capture');
       }
 
-      toast.success('Captured successfully!');
+      const result = response.data;
+      if (!result?.success) {
+        throw new Error(result?.error || 'Capture failed — no confirmation from server');
+      }
+
+      toast.success(result.confirmation || 'Captured successfully!');
       setText('');
     } catch (error) {
       console.error('Capture error:', error);
