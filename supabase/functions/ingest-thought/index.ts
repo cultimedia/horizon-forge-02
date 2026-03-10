@@ -2,18 +2,37 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-ingest-key, x-api-key",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-ingest-key, x-api-key, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ── Auth ──────────────────────────────────────────────────────────
-function authenticate(req: Request): boolean {
+// ── Auth: accepts API key OR JWT ──────────────────────────────────
+async function authenticate(req: Request): Promise<{ authenticated: boolean; userId?: string }> {
+  // 1. Check API key auth (for CLI/external callers)
   const ingestKey = Deno.env.get("INGEST_API_KEY");
-  const provided =
+  const apiKeyProvided =
     req.headers.get("x-ingest-key") ??
     req.headers.get("x-api-key") ??
     req.headers.get("X-API-Key") ??
     new URL(req.url).searchParams.get("key");
-  return provided === ingestKey;
+  if (apiKeyProvided && apiKeyProvided === ingestKey) {
+    return { authenticated: true };
+  }
+
+  // 2. Check JWT auth (for frontend callers via supabase.functions.invoke)
+  const authHeader = req.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data?.user) {
+      return { authenticated: true, userId: data.user.id };
+    }
+  }
+
+  return { authenticated: false };
 }
 
 // ── OpenRouter call ───────────────────────────────────────────────
