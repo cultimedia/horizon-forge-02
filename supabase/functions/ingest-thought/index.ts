@@ -191,22 +191,27 @@ Deno.serve(async (req) => {
       someday: "backlog",
     };
 
-    // Run embedding + classification in parallel
-    const [embedding, classification] = await Promise.all([
-      embed(content),
-      classify(content),
-    ]);
-
+    // Fetch user's horizons first (needed for classification)
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const horizonId = await resolveHorizonId(
-      supabase,
-      userId,
-      classification.horizon
-    );
+    const { data: userHorizons } = await supabase
+      .from("horizons")
+      .select("id, name, description")
+      .eq("user_id", userId)
+      .eq("is_active", true);
+
+    const horizons = userHorizons ?? [];
+
+    // Run embedding + classification in parallel
+    const [embedding, classification] = await Promise.all([
+      embed(content),
+      classify(content, horizons.map((h) => ({ name: h.name, description: h.description }))),
+    ]);
+
+    const horizonId = resolveHorizonByName(horizons, classification.horizon_name);
 
     // Note: DB column is "due_date" not "due_at"
     const { data: task, error } = await supabase
