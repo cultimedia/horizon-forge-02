@@ -1,109 +1,232 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-ingest-key, x-api-key",
 };
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+// ── Auth ──────────────────────────────────────────────────────────
+function authenticate(req: Request): boolean {
+  const ingestKey = Deno.env.get("INGEST_API_KEY");
+  const provided =
+    req.headers.get("x-ingest-key") ??
+    req.headers.get("x-api-key") ??
+    req.headers.get("X-API-Key") ??
+    new URL(req.url).searchParams.get("key");
+  return provided === ingestKey;
+}
+
+// ── OpenRouter call ───────────────────────────────────────────────
+async function openRouterChat(messages: object[], model = "openai/gpt-4o-mini") {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${Deno.env.get("OPENROUTER_API_KEY")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model, messages, max_tokens: 500 }),
+  });
+  if (!res.ok) throw new Error(`OpenRouter chat error: ${res.status}`);
+  const data = await res.json();
+  return data.choices[0].message.content as string;
+}
+
+// ── Embedding ─────────────────────────────────────────────────────
+async function embed(text: string): Promise<number[]> {
+  const res = await fetch("https://openrouter.ai/api/v1/embeddings", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${Deno.env.get("OPENROUTER_API_KEY")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "openai/text-embedding-3-small",
+      input: text,
+    }),
+  });
+  if (!res.ok) throw new Error(`Embedding error: ${res.status}`);
+  const data = await res.json();
+  return data.data[0].embedding;
+}
+
+// ── Classifier ────────────────────────────────────────────────────
+async function classify(content: string) {
+  const today = new Date().toISOString().split("T")[0];
+  const prompt = `You are a thought classifier for a personal knowledge system. Today is ${today}.
+
+Classify the following capture and extract structured metadata. Respond ONLY with valid JSON — no markdown, no explanation.
+
+Capture: "${content}"
+
+Respond with this exact shape:
+{
+  "type": "task|idea|person_note|appointment|reference",
+  "confidence": 0.0-1.0,
+  "title": "clean, concise title for this item",
+  "horizon": "today|this_week|this_month|someday",
+  "due_at": "ISO 8601 datetime or null",
+  "remind_at": "ISO 8601 datetime or null",
+  "metadata": {
+    "people": ["name1", "name2"],
+    "tags": ["tag1", "tag2"],
+    "action_items": ["action1"],
+    "summary": "one sentence summary"
+  }
+}
+
+Rules:
+- type=task if it requires action
+- type=appointment if it has a specific time/date
+- type=person_note if it's primarily about a person
+- type=idea if it's a thought, insight, or concept
+- type=reference if it's factual info to remember
+- Set remind_at only if the capture explicitly mentions wanting a reminder
+- Set due_at if any date/time is mentioned
+- confidence reflects how certain you are about the classification`;
+
+  const raw = await openRouterChat([{ role: "user", content: prompt }]);
+  try {
+    return JSON.parse(raw.replace(/```json|```/g, "").trim());
+  } catch {
+    return {
+      type: "task",
+      confidence: 0.5,
+      title: content.slice(0, 100),
+      horizon: "someday",
+      due_at: null,
+      remind_at: null,
+      metadata: { people: [], tags: [], action_items: [], summary: content },
+    };
+  }
+}
+
+// ── Horizon lookup ────────────────────────────────────────────────
+async function resolveHorizonId(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  horizonLabel: string
+): Promise<string | null> {
+  const labelMap: Record<string, string[]> = {
+    today: ["today", "daily", "now"],
+    this_week: ["week", "weekly", "this week"],
+    this_month: ["month", "monthly", "this month"],
+    someday: ["someday", "later", "backlog", "inbox"],
+  };
+  const candidates = labelMap[horizonLabel] ?? ["inbox"];
+
+  const { data } = await supabase
+    .from("horizons")
+    .select("id, name")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+
+  if (!data || data.length === 0) return null;
+
+  for (const candidate of candidates) {
+    const match = data.find((h: { id: string; name: string }) =>
+      h.name.toLowerCase().includes(candidate)
+    );
+    if (match) return match.id;
   }
 
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ ok: false, error: 'Method not allowed' }),
-      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+  return data[0].id;
+}
+
+// ── Main handler ──────────────────────────────────────────────────
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  if (!authenticate(req)) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
-    // Support both authenticated (browser) and API key (automation) access
-    const apiKey = req.headers.get('X-API-Key') || req.headers.get('x-api-key') || req.headers.get('x-ingest-key');
-    const urlKey = new URL(req.url).searchParams.get('key');
-    const effectiveApiKey = apiKey || urlKey;
-    const authHeader = req.headers.get('Authorization');
-    let userId: string | null = null;
+    const body = await req.json();
+    const content: string = body.content ?? body.text ?? body.message;
+    const userId: string = body.user_id;
 
-    if (effectiveApiKey) {
-      // Machine/automation path
-      const expectedApiKey = Deno.env.get('INGEST_API_KEY');
-      if (!expectedApiKey || effectiveApiKey !== expectedApiKey) {
-        return new Response(
-          JSON.stringify({ ok: false, error: 'Unauthorized' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      // For API key auth, we don't have a user context — caller can pass user_id in body
-    } else if (authHeader?.startsWith('Bearer ')) {
-      // Browser/session path
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_ANON_KEY')!,
-        { global: { headers: { Authorization: authHeader } } }
-      );
-
-      const token = authHeader.replace('Bearer ', '');
-      const { data, error } = await supabase.auth.getUser(token);
-      if (error || !data?.user) {
-        return new Response(
-          JSON.stringify({ ok: false, error: 'Unauthorized' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      userId = data.user.id;
-    } else {
+    if (!content || !userId) {
       return new Response(
-        JSON.stringify({ ok: false, error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "content and user_id are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Parse body
-    let body: { text?: string; capture?: string; source?: string; user_id?: string };
-    try {
-      body = await req.json();
-    } catch {
-      return new Response(
-        JSON.stringify({ ok: false, error: 'Invalid JSON body' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Run embedding + classification in parallel
+    const [embedding, classification] = await Promise.all([
+      embed(content),
+      classify(content),
+    ]);
 
-    const captureText = (body.text || body.capture || '').trim();
-    if (!captureText) {
-      return new Response(
-        JSON.stringify({ ok: false, error: 'Text is required (use "text" or "capture" field)' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (captureText.length > 10000) {
-      return new Response(
-        JSON.stringify({ ok: false, error: 'Text too long (max 10,000 characters)' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // For API key auth, allow user_id from body
-    const effectiveUserId = userId || body.user_id;
-
-    console.log(`ingest-thought: source=${body.source || 'browser'}, userId=${effectiveUserId || 'unknown'}, len=${captureText.length}`);
-
-    // TODO: Add OpenRouter AI processing here (classify, embed, etc.)
-    // The OPENROUTER_API_KEY secret is available via Deno.env.get('OPENROUTER_API_KEY')
-
-    return new Response(
-      JSON.stringify({ ok: true, text: captureText, user_id: effectiveUserId }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-  } catch (error) {
-    console.error('ingest-thought error:', error);
+    const horizonId = await resolveHorizonId(
+      supabase,
+      userId,
+      classification.horizon
+    );
+
+    // Note: DB column is "due_date" not "due_at"
+    const { data: task, error } = await supabase
+      .from("tasks")
+      .insert({
+        user_id: userId,
+        horizon_id: horizonId,
+        title: classification.title,
+        type: classification.type,
+        embedding,
+        metadata: classification.metadata,
+        due_date: classification.due_at ?? null,
+        remind_at: classification.remind_at ?? null,
+        confidence: classification.confidence,
+        notes: content,
+        timeframe: classification.horizon,
+        completed: false,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Build human-readable confirmation
+    const people =
+      classification.metadata.people?.length > 0
+        ? ` | People: ${classification.metadata.people.join(", ")}`
+        : "";
+    const due = classification.due_at
+      ? ` | Due: ${new Date(classification.due_at).toLocaleDateString()}`
+      : "";
+    const remind = classification.remind_at
+      ? ` | Reminder set: ${new Date(classification.remind_at).toLocaleDateString()}`
+      : "";
+    const conf = Math.round(classification.confidence * 100);
+
+    const confirmation = `✓ Captured as ${classification.type} → "${classification.title}"${people}${due}${remind} | Confidence: ${conf}%`;
+
     return new Response(
-      JSON.stringify({ ok: false, error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        success: true,
+        confirmation,
+        task_id: task.id,
+        type: classification.type,
+        title: classification.title,
+        confidence: classification.confidence,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    console.error("ingest-thought error:", err);
+    return new Response(
+      JSON.stringify({ error: err.message ?? "Internal error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
