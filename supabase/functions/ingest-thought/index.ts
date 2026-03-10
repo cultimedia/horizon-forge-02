@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
         remind_at: classification.remind_at ?? null,
         confidence: classification.confidence,
         notes: content,
-        timeframe: timeframeMap[classification.horizon] ?? "today",
+        timeframe: timeframeMap[classification.timeframe] ?? "today",
         completed: false,
       })
       .select()
