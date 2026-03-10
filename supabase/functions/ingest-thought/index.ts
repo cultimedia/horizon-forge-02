@@ -69,9 +69,19 @@ async function embed(text: string): Promise<number[]> {
 }
 
 // ── Classifier ────────────────────────────────────────────────────
-async function classify(content: string) {
+async function classify(content: string, horizons: { name: string; description: string | null }[]) {
   const today = new Date().toISOString().split("T")[0];
+  const horizonList = horizons
+    .map((h) => {
+      const desc = h.description ? ` — ${h.description}` : "";
+      return `- "${h.name}"${desc}`;
+    })
+    .join("\n");
+
   const prompt = `You are a thought classifier for a personal knowledge system. Today is ${today}.
+
+The user has these horizons (categories):
+${horizonList}
 
 Classify the following capture and extract structured metadata. Respond ONLY with valid JSON — no markdown, no explanation.
 
@@ -82,7 +92,8 @@ Respond with this exact shape:
   "type": "task|idea|person_note|appointment|reference",
   "confidence": 0.0-1.0,
   "title": "clean, concise title for this item",
-  "horizon": "today|this_week|this_month|someday",
+  "horizon_name": "exact name of the best-matching horizon from the list above",
+  "timeframe": "today|this_week|this_month|someday",
   "due_at": "ISO 8601 datetime or null",
   "remind_at": "ISO 8601 datetime or null",
   "metadata": {
@@ -99,6 +110,8 @@ Rules:
 - type=person_note if it's primarily about a person
 - type=idea if it's a thought, insight, or concept
 - type=reference if it's factual info to remember
+- horizon_name MUST be one of the exact horizon names listed above
+- Use the horizon descriptions to decide which horizon fits best (e.g. if people mentioned match a horizon's description, use that horizon)
 - Set remind_at only if the capture explicitly mentions wanting a reminder
 - Set due_at if any date/time is mentioned
 - confidence reflects how certain you are about the classification`;
@@ -111,7 +124,8 @@ Rules:
       type: "task",
       confidence: 0.5,
       title: content.slice(0, 100),
-      horizon: "someday",
+      horizon_name: horizons[0]?.name ?? "Inbox",
+      timeframe: "someday",
       due_at: null,
       remind_at: null,
       metadata: { people: [], tags: [], action_items: [], summary: content },
