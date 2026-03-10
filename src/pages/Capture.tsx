@@ -26,7 +26,7 @@ export default function Capture() {
         return;
       }
 
-      const response = await supabase.functions.invoke('taskade-capture', {
+      const response = await supabase.functions.invoke('ingest-thought', {
         body: { text: text.trim() }
       });
 
