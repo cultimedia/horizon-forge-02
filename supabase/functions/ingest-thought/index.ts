@@ -157,7 +157,8 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  if (!authenticate(req)) {
+  const auth = await authenticate(req);
+  if (!auth.authenticated) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -167,7 +168,8 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const content: string = body.content ?? body.text ?? body.message;
-    const userId: string = body.user_id;
+    // Use user_id from body (API key auth) or from JWT (frontend auth)
+    const userId: string = body.user_id ?? auth.userId;
 
     if (!content || !userId) {
       return new Response(
