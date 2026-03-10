@@ -92,39 +92,54 @@ export type Database = {
         Row: {
           completed: boolean | null
           completed_at: string | null
+          confidence: number | null
           created_at: string | null
           due_date: string | null
+          embedding: string | null
           horizon_id: string
           id: string
+          metadata: Json | null
           notes: string | null
+          remind_at: string | null
           timeframe: string
           title: string
+          type: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
           completed?: boolean | null
           completed_at?: string | null
+          confidence?: number | null
           created_at?: string | null
           due_date?: string | null
+          embedding?: string | null
           horizon_id: string
           id?: string
+          metadata?: Json | null
           notes?: string | null
+          remind_at?: string | null
           timeframe?: string
           title: string
+          type?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
           completed?: boolean | null
           completed_at?: string | null
+          confidence?: number | null
           created_at?: string | null
           due_date?: string | null
+          embedding?: string | null
           horizon_id?: string
           id?: string
+          metadata?: Json | null
           notes?: string | null
+          remind_at?: string | null
           timeframe?: string
           title?: string
+          type?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -143,7 +158,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      match_tasks: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          id: string
+          metadata: Json
+          similarity: number
+          type: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
