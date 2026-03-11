@@ -71,10 +71,12 @@ All tables have RLS enabled. Per-user isolation via `auth.uid() = user_id`. Serv
 
 | Function | Status | Action |
 |---|---|---|
-| `taskade-capture` | Obsolete — sends to Taskade | Leave alone, will stop being called |
-| `ingest` | Unknown — check logs | Audit, may overlap with new function |
-| `cleanup-completed-tasks` | Fine as-is | Leave alone |
-| `send-daily-digest` | Exists, needs rewrite | Phase 2 |
+| `taskade-capture` | Obsolete | Dead, ignore |
+| `ingest` | Obsolete | Superseded by `ingest-thought` |
+| `ingest-thought` | ✅ Live | Main capture pipeline |
+| `cleanup-completed-tasks` | ✅ Live | Housekeeping |
+| `send-daily-digest` | ✅ Live | Daily email, cron at 10am Central |
+| `open-brain-mcp` | ✅ Live | MCP server for agent queries |
 
 ---
 
