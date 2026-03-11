@@ -169,7 +169,7 @@ Rewrite the existing function. Keep the same function name. Resend is already wi
 
 ---
 
-### 🔲 Phase 3 — MCP Server (`open-brain-mcp`)
+### ✅ Phase 3 — MCP Server (`open-brain-mcp`) (DEPLOYED)
 
 New edge function. This is what opens the door for OpenClaw and any other MCP client.
 
