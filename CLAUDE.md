@@ -17,10 +17,10 @@ This is not a notes app. It's a loop-driven cognitive system with an agent-reada
 | Frontend | Horizons (Lovable) — React/Vite/TypeScript/shadcn | ✅ Live, working |
 | Database | Supabase project `lfaxxfyfyxghdcjlokwn` | ✅ Schema migrated |
 | Email | Resend, sending domain `ops.holyhell.io` | ✅ DNS verified |
-| AI gateway | OpenRouter | 🔲 Key needed |
-| Capture function | `ingest-thought` (written, needs deploy) | 🔲 Deploy pending |
-| Digest function | `send-daily-digest` (exists, needs rewrite) | 🔲 Rewrite pending |
-| MCP server | `open-brain-mcp` (not yet written) | 🔲 Phase 3 |
+| AI gateway | OpenRouter | ✅ Key set |
+| Capture function | `ingest-thought` | ✅ Deployed |
+| Digest function | `send-daily-digest` | ✅ Rewritten, cron active |
+| MCP server | `open-brain-mcp` | ✅ Deployed |
 | Reminders | pg_cron + `send-reminder` function | 🔲 Phase 4 |
 
 ---
@@ -71,10 +71,12 @@ All tables have RLS enabled. Per-user isolation via `auth.uid() = user_id`. Serv
 
 | Function | Status | Action |
 |---|---|---|
-| `taskade-capture` | Obsolete — sends to Taskade | Leave alone, will stop being called |
-| `ingest` | Unknown — check logs | Audit, may overlap with new function |
-| `cleanup-completed-tasks` | Fine as-is | Leave alone |
-| `send-daily-digest` | Exists, needs rewrite | Phase 2 |
+| `taskade-capture` | Obsolete | Dead, ignore |
+| `ingest` | Obsolete | Superseded by `ingest-thought` |
+| `ingest-thought` | ✅ Live | Main capture pipeline |
+| `cleanup-completed-tasks` | ✅ Live | Housekeeping |
+| `send-daily-digest` | ✅ Live | Daily email, cron at 10am Central |
+| `open-brain-mcp` | ✅ Live | MCP server for agent queries |
 
 ---
 
@@ -87,8 +89,7 @@ All tables have RLS enabled. Per-user isolation via `auth.uid() = user_id`. Serv
 - `SUPABASE_URL` — auto-available in edge functions
 - `SUPABASE_SERVICE_ROLE_KEY` — auto-available in edge functions
 
-**Secret to add:**
-- `OPENROUTER_API_KEY` — Keith is getting this from openrouter.ai
+- `OPENROUTER_API_KEY` — ✅ set, OpenRouter AI gateway
 
 ---
 
@@ -102,7 +103,7 @@ All tables have RLS enabled. Per-user isolation via `auth.uid() = user_id`. Serv
 
 ---
 
-### 🔲 Phase 1 — Deploy `ingest-thought` (NEXT)
+### ✅ Phase 1 — `ingest-thought` (DEPLOYED)
 
 The function is already written. File location in this folder: `ingest-thought/index.ts`
 
@@ -149,7 +150,7 @@ Expected response:
 
 ---
 
-### 🔲 Phase 2 — Rewrite `send-daily-digest`
+### ✅ Phase 2 — `send-daily-digest` (DEPLOYED)
 
 Rewrite the existing function. Keep the same function name. Resend is already wired.
 
@@ -168,7 +169,7 @@ Rewrite the existing function. Keep the same function name. Resend is already wi
 
 ---
 
-### 🔲 Phase 3 — MCP Server (`open-brain-mcp`)
+### ✅ Phase 3 — MCP Server (`open-brain-mcp`) (DEPLOYED)
 
 New edge function. This is what opens the door for OpenClaw and any other MCP client.
 
@@ -250,5 +251,8 @@ That's it. Build that.
 
 ## Files In This Folder
 
-- `CLAUDE.md` — this file
-- `ingest-thought/index.ts` — Phase 1 edge function, ready to deploy
+- `CLAUDE.md` — this file (architecture + phase tracker)
+- `supabase/functions/ingest-thought/index.ts` — capture pipeline
+- `supabase/functions/send-daily-digest/index.ts` — daily email digest
+- `supabase/functions/open-brain-mcp/index.ts` — MCP server
+- `supabase/functions/cleanup-completed-tasks/index.ts` — housekeeping

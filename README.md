@@ -12,6 +12,8 @@ A loop-driven cognitive capture system that lets Keith dump thoughts by voice or
 2. **AI classifies** — OpenRouter-powered pipeline extracts type, title, people, dates, and routes to the correct Horizon
 3. **Semantic memory** — every capture gets a 1536-dim embedding for future agent queries via `match_tasks()`
 4. **Horizon-aware routing** — the classifier reads each Horizon's description from the DB to make accurate routing decisions
+5. **Daily digest** — automated email summary of upcoming tasks, reminders, and stuck items
+6. **MCP server** — any AI client (Claude Desktop, OpenClaw, Cursor) can query your brain semantically
 
 ## Horizons (Life Categories)
 
@@ -34,12 +36,14 @@ A loop-driven cognitive capture system that lets Keith dump thoughts by voice or
 | AI Gateway | OpenRouter (GPT-4o-mini classify, text-embedding-3-small) |
 | Email | Resend via `ops.holyhell.io` |
 | Capture | `ingest-thought` edge function |
+| MCP | `open-brain-mcp` edge function |
 
 ## Edge Functions
 
 - **`ingest-thought`** — Main capture pipeline. Accepts `{ content, user_id }`, runs embedding + classification in parallel, inserts task with metadata. Dual auth: JWT (web UI) or API key (Shortcuts/CLI).
+- **`open-brain-mcp`** — MCP server exposing `search_thoughts`, `browse_recent`, `get_stats`, and `capture_thought` tools. API key auth via query param or header.
+- **`send-daily-digest`** — Automated email digest of upcoming tasks, reminders, and stuck items. Runs daily at 10am Central via pg_cron.
 - **`cleanup-completed-tasks`** — Housekeeping for completed items.
-- **`send-daily-digest`** — Email digest (Phase 2, pending rewrite).
 
 ## iPad Shortcut Integration
 
@@ -53,8 +57,8 @@ The system accepts voice captures from Apple Shortcuts:
 
 - ✅ **Phase 0** — Schema surgery (pgvector, embeddings, metadata columns)
 - ✅ **Phase 1** — `ingest-thought` deployed and working
-- 🔲 **Phase 2** — Rewrite `send-daily-digest` with Resend
-- 🔲 **Phase 3** — MCP server (`open-brain-mcp`) for agent queries
+- ✅ **Phase 2** — `send-daily-digest` rewritten with Resend, cron scheduled (10am Central)
+- ✅ **Phase 3** — `open-brain-mcp` deployed — MCP server for agent queries
 - 🔲 **Phase 4** — Reminders via pg_cron + `send-reminder`
 
 ## Stack
