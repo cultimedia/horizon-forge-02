@@ -13,6 +13,8 @@ interface Task {
   horizon_id: string;
   timeframe: string;
   completed: boolean;
+  created_at: string;
+  remind_at: string | null;
 }
 
 interface Horizon {
@@ -24,116 +26,58 @@ interface Horizon {
 interface UserSettings {
   user_id: string;
   email_for_digest: string;
-  notification_time: string | null;
 }
 
-const formatDate = (date: Date): string => {
-  return date.toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
-};
+const formatDate = (date: Date): string =>
+  date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+const shortDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
 const generateEmailHTML = (
-  tasks: Task[], 
-  horizons: Horizon[], 
-  weekTasks: Task[]
+  upcoming: Task[],
+  reminders: Task[],
+  stuck: Task | null,
+  horizonMap: Map<string, Horizon>
 ): string => {
-  const horizonMap = new Map(horizons.map(h => [h.id, h]));
-  
-  // Group today's tasks by horizon
-  const tasksByHorizon = new Map<string, Task[]>();
-  tasks.forEach(task => {
-    const existing = tasksByHorizon.get(task.horizon_id) || [];
-    tasksByHorizon.set(task.horizon_id, [...existing, task]);
-  });
+  const taskLine = (t: Task): string => {
+    const h = horizonMap.get(t.horizon_id);
+    const due = t.due_date ? ` · due ${shortDate(t.due_date)}` : '';
+    return `<li style="margin:6px 0;color:#e0e0e0;">${t.title}<span style="color:#666;font-size:12px;"> (${h?.name || '—'}${due})</span></li>`;
+  };
 
-  const todayTasksHTML = Array.from(tasksByHorizon.entries())
-    .map(([horizonId, horizonTasks]) => {
-      const horizon = horizonMap.get(horizonId);
-      const horizonName = horizon?.name || 'Unknown';
-      const horizonColor = horizon?.color || '#38b5b5';
-      
-      const tasksListHTML = horizonTasks
-        .map(t => `<li style="margin: 8px 0; color: #e0e0e0;">${t.title}</li>`)
-        .join('');
-      
-      return `
-        <div style="margin-bottom: 24px;">
-          <h3 style="color: ${horizonColor}; margin: 0 0 12px 0; font-size: 16px; font-weight: 500;">
-            ${horizonName}
-          </h3>
-          <ul style="margin: 0; padding-left: 20px; list-style-type: disc;">
-            ${tasksListHTML}
-          </ul>
-        </div>
-      `;
-    })
-    .join('');
+  const upcomingHTML = upcoming.length > 0
+    ? `<h2 style="color:#38b5b5;margin:0 0 12px;font-size:16px;font-weight:400;">Upcoming</h2>
+       <ul style="margin:0 0 24px;padding-left:20px;list-style:disc;">${upcoming.map(taskLine).join('')}</ul>`
+    : '<p style="color:#888;font-style:italic;margin:0 0 24px;">No upcoming tasks. A clear day awaits.</p>';
 
-  // This week's deadlines (tasks with due dates this week, not today)
-  const weekDeadlinesHTML = weekTasks.length > 0
-    ? `
-      <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #333;">
-        <h2 style="color: #38b5b5; margin: 0 0 16px 0; font-size: 18px; font-weight: 400;">
-          This Week's Deadlines
-        </h2>
-        <ul style="margin: 0; padding-left: 20px; list-style-type: disc;">
-          ${weekTasks.map(t => {
-            const horizon = horizonMap.get(t.horizon_id);
-            const dueDate = t.due_date ? new Date(t.due_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
-            return `<li style="margin: 8px 0; color: #e0e0e0;">
-              ${t.title} 
-              <span style="color: #888; font-size: 12px;">(${dueDate} · ${horizon?.name || 'Unknown'})</span>
-            </li>`;
-          }).join('')}
-        </ul>
-      </div>
-    `
+  const remindersHTML = reminders.length > 0
+    ? `<h2 style="color:#d4a853;margin:0 0 12px;font-size:16px;font-weight:400;">Reminders (next 24h)</h2>
+       <ul style="margin:0 0 24px;padding-left:20px;list-style:disc;">${reminders.map(taskLine).join('')}</ul>`
     : '';
 
-  const emptyMessage = tasks.length === 0 
-    ? '<p style="color: #888; font-style: italic;">No tasks scheduled for today. A clear day awaits.</p>'
+  const stuckHTML = stuck
+    ? `<div style="margin-top:8px;padding:16px;border-left:3px solid #e05555;background:#1a1a1a;">
+         <p style="color:#e05555;margin:0 0 4px;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:1px;">Stuck Item</p>
+         <p style="color:#e0e0e0;margin:0;">${stuck.title} <span style="color:#666;font-size:12px;">(${horizonMap.get(stuck.horizon_id)?.name || '—'} · created ${shortDate(stuck.created_at)})</span></p>
+       </div>`
     : '';
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-    <body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-      <div style="max-width: 600px; margin: 0 auto; padding: 40px 24px;">
-        <header style="margin-bottom: 32px;">
-          <h1 style="color: #f0f0f0; margin: 0 0 8px 0; font-size: 24px; font-weight: 300; letter-spacing: 0.5px;">
-            Your 10am Brief
-          </h1>
-          <p style="color: #666; margin: 0; font-size: 14px;">
-            ${formatDate(new Date())}
-          </p>
-        </header>
-        
-        <main>
-          <h2 style="color: #38b5b5; margin: 0 0 20px 0; font-size: 18px; font-weight: 400;">
-            Today's Focus
-          </h2>
-          ${emptyMessage}
-          ${todayTasksHTML}
-          ${weekDeadlinesHTML}
-        </main>
-        
-        <footer style="margin-top: 48px; padding-top: 24px; border-top: 1px solid #222;">
-          <p style="color: #555; font-size: 12px; margin: 0;">
-            Sent from Horizons · Your constellation of intentions
-          </p>
-        </footer>
-      </div>
-    </body>
-    </html>
-  `;
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:560px;margin:0 auto;padding:40px 24px;">
+  <header style="margin-bottom:28px;">
+    <h1 style="color:#f0f0f0;margin:0 0 6px;font-size:22px;font-weight:300;letter-spacing:0.5px;">Your Daily Brief</h1>
+    <p style="color:#555;margin:0;font-size:13px;">${formatDate(new Date())}</p>
+  </header>
+  ${upcomingHTML}
+  ${remindersHTML}
+  ${stuckHTML}
+  <footer style="margin-top:40px;padding-top:20px;border-top:1px solid #222;">
+    <p style="color:#444;font-size:11px;margin:0;">Sent from Horizons · Your constellation of intentions</p>
+  </footer>
+</div></body></html>`;
 };
 
 Deno.serve(async (req) => {
@@ -144,135 +88,103 @@ Deno.serve(async (req) => {
   try {
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
-      console.error('RESEND_API_KEY not configured');
-      return new Response(JSON.stringify({ error: 'Email service not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      return new Response(JSON.stringify({ error: 'RESEND_API_KEY not configured' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const resend = new Resend(resendApiKey);
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
-    // Get all users with email_for_digest configured
-    const { data: settings, error: settingsError } = await supabase
+    // Get users with digest configured
+    const { data: settings, error: settingsErr } = await supabase
       .from('settings')
-      .select('user_id, email_for_digest, notification_time')
+      .select('user_id, email_for_digest')
       .not('email_for_digest', 'is', null);
 
-    if (settingsError) {
-      console.error('Error fetching settings:', settingsError);
-      return new Response(JSON.stringify({ error: settingsError.message }), {
-        status: 500,
+    if (settingsErr) throw settingsErr;
+    if (!settings?.length) {
+      return new Response(JSON.stringify({ success: true, sent: 0, skipped: 0, message: 'No users with digest configured' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    if (!settings || settings.length === 0) {
-      console.log('No users with digest email configured');
-      return new Response(JSON.stringify({ success: true, sent: 0 }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log(`Found ${settings.length} users with digest configured`);
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const endOfWeek = new Date(today);
-    endOfWeek.setDate(endOfWeek.getDate() + 7);
-
-    let sentCount = 0;
+    const now = new Date();
+    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    let sent = 0;
+    let skipped = 0;
     const errors: string[] = [];
 
-    for (const userSetting of settings as UserSettings[]) {
+    for (const user of settings as UserSettings[]) {
       try {
-        // Fetch user's horizons
-        const { data: horizons, error: horizonsError } = await supabase
-          .from('horizons')
-          .select('id, name, color')
-          .eq('user_id', userSetting.user_id)
-          .eq('is_active', true);
+        // Parallel fetch: horizons, upcoming tasks, reminder tasks, stuck item
+        const [horizonsRes, upcomingRes, remindersRes, stuckRes] = await Promise.all([
+          supabase.from('horizons').select('id, name, color').eq('user_id', user.user_id).eq('is_active', true),
+          supabase.from('tasks').select('id, title, due_date, horizon_id, timeframe, completed, created_at, remind_at')
+            .eq('user_id', user.user_id).eq('completed', false)
+            .not('due_date', 'is', null)
+            .gte('due_date', now.toISOString())
+            .order('due_date', { ascending: true }).limit(3),
+          supabase.from('tasks').select('id, title, due_date, horizon_id, timeframe, completed, created_at, remind_at')
+            .eq('user_id', user.user_id).eq('completed', false)
+            .not('remind_at', 'is', null)
+            .gte('remind_at', now.toISOString())
+            .lte('remind_at', in24h.toISOString()),
+          supabase.from('tasks').select('id, title, due_date, horizon_id, timeframe, completed, created_at, remind_at')
+            .eq('user_id', user.user_id).eq('completed', false)
+            .order('created_at', { ascending: true }).limit(1),
+        ]);
 
-        if (horizonsError) {
-          console.error(`Error fetching horizons for user ${userSetting.user_id}:`, horizonsError);
-          errors.push(`User ${userSetting.user_id}: ${horizonsError.message}`);
+        if (horizonsRes.error) throw horizonsRes.error;
+
+        const horizonMap = new Map((horizonsRes.data as Horizon[]).map(h => [h.id, h]));
+        const upcoming = (upcomingRes.data || []) as Task[];
+        const reminders = (remindersRes.data || []) as Task[];
+        const stuck = (stuckRes.data?.[0] || null) as Task | null;
+
+        // Skip if nothing to report
+        if (upcoming.length === 0 && reminders.length === 0 && !stuck) {
+          skipped++;
           continue;
         }
 
-        // Fetch today's tasks
-        const { data: todayTasks, error: todayError } = await supabase
-          .from('tasks')
-          .select('id, title, due_date, horizon_id, timeframe, completed')
-          .eq('user_id', userSetting.user_id)
-          .eq('completed', false)
-          .eq('timeframe', 'today');
+        // Deduplicate: remove reminder items that already appear in upcoming
+        const upcomingIds = new Set(upcoming.map(t => t.id));
+        const uniqueReminders = reminders.filter(t => !upcomingIds.has(t.id));
 
-        if (todayError) {
-          console.error(`Error fetching today tasks for user ${userSetting.user_id}:`, todayError);
-          errors.push(`User ${userSetting.user_id}: ${todayError.message}`);
-          continue;
-        }
+        // Don't show stuck item if it's already in upcoming or reminders
+        const allShownIds = new Set([...upcomingIds, ...uniqueReminders.map(t => t.id)]);
+        const finalStuck = stuck && !allShownIds.has(stuck.id) ? stuck : null;
 
-        // Fetch this week's tasks (excluding today)
-        const { data: weekTasks, error: weekError } = await supabase
-          .from('tasks')
-          .select('id, title, due_date, horizon_id, timeframe, completed')
-          .eq('user_id', userSetting.user_id)
-          .eq('completed', false)
-          .eq('timeframe', 'week')
-          .not('due_date', 'is', null)
-          .gte('due_date', tomorrow.toISOString())
-          .lt('due_date', endOfWeek.toISOString())
-          .order('due_date', { ascending: true });
+        const html = generateEmailHTML(upcoming, uniqueReminders, finalStuck, horizonMap);
 
-        if (weekError) {
-          console.error(`Error fetching week tasks for user ${userSetting.user_id}:`, weekError);
-          errors.push(`User ${userSetting.user_id}: ${weekError.message}`);
-          continue;
-        }
-
-        const emailHTML = generateEmailHTML(
-          (todayTasks || []) as Task[],
-          (horizons || []) as Horizon[],
-          (weekTasks || []) as Task[]
-        );
-
-        const emailResponse = await resend.emails.send({
-          from: 'Horizons <brief@ops.holyhell.io>',
-          to: [userSetting.email_for_digest],
-          subject: `Your 10am Brief - ${formatDate(new Date())}`,
-          html: emailHTML,
+        await resend.emails.send({
+          from: 'Horizons <brain@ops.holyhell.io>',
+          to: [user.email_for_digest],
+          subject: `Your Daily Brief — ${formatDate(new Date())}`,
+          html,
         });
 
-        console.log(`Email sent to ${userSetting.email_for_digest}:`, emailResponse);
-        sentCount++;
-      } catch (userError) {
-        console.error(`Error processing user ${userSetting.user_id}:`, userError);
-        errors.push(`User ${userSetting.user_id}: ${String(userError)}`);
+        sent++;
+        console.log(`✓ Digest sent to ${user.email_for_digest}`);
+      } catch (userErr) {
+        const msg = `User ${user.user_id}: ${String(userErr)}`;
+        console.error(msg);
+        errors.push(msg);
       }
     }
 
-    console.log(`Daily digest complete: ${sentCount} emails sent, ${errors.length} errors`);
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        sent: sentCount, 
-        total: settings.length,
-        errors: errors.length > 0 ? errors : undefined 
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error) {
-    console.error('Daily digest function error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
+    console.log(`Daily digest: ${sent} sent, ${skipped} skipped, ${errors.length} errors`);
+    return new Response(JSON.stringify({ success: true, sent, skipped, total: settings.length, errors: errors.length > 0 ? errors : undefined }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    console.error('Daily digest error:', err);
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
