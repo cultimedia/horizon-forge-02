@@ -103,7 +103,7 @@ All tables have RLS enabled. Per-user isolation via `auth.uid() = user_id`. Serv
 
 ---
 
-### 🔲 Phase 1 — Deploy `ingest-thought` (NEXT)
+### ✅ Phase 1 — `ingest-thought` (DEPLOYED)
 
 The function is already written. File location in this folder: `ingest-thought/index.ts`
 
