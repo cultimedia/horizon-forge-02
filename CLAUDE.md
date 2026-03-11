@@ -251,5 +251,8 @@ That's it. Build that.
 
 ## Files In This Folder
 
-- `CLAUDE.md` — this file
-- `ingest-thought/index.ts` — Phase 1 edge function, ready to deploy
+- `CLAUDE.md` — this file (architecture + phase tracker)
+- `supabase/functions/ingest-thought/index.ts` — capture pipeline
+- `supabase/functions/send-daily-digest/index.ts` — daily email digest
+- `supabase/functions/open-brain-mcp/index.ts` — MCP server
+- `supabase/functions/cleanup-completed-tasks/index.ts` — housekeeping
