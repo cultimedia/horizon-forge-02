@@ -89,8 +89,7 @@ All tables have RLS enabled. Per-user isolation via `auth.uid() = user_id`. Serv
 - `SUPABASE_URL` — auto-available in edge functions
 - `SUPABASE_SERVICE_ROLE_KEY` — auto-available in edge functions
 
-**Secret to add:**
-- `OPENROUTER_API_KEY` — Keith is getting this from openrouter.ai
+- `OPENROUTER_API_KEY` — ✅ set, OpenRouter AI gateway
 
 ---
 
