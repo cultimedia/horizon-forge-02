@@ -150,7 +150,7 @@ Expected response:
 
 ---
 
-### 🔲 Phase 2 — Rewrite `send-daily-digest`
+### ✅ Phase 2 — `send-daily-digest` (DEPLOYED)
 
 Rewrite the existing function. Keep the same function name. Resend is already wired.
 
