@@ -17,10 +17,10 @@ This is not a notes app. It's a loop-driven cognitive system with an agent-reada
 | Frontend | Horizons (Lovable) — React/Vite/TypeScript/shadcn | ✅ Live, working |
 | Database | Supabase project `lfaxxfyfyxghdcjlokwn` | ✅ Schema migrated |
 | Email | Resend, sending domain `ops.holyhell.io` | ✅ DNS verified |
-| AI gateway | OpenRouter | 🔲 Key needed |
-| Capture function | `ingest-thought` (written, needs deploy) | 🔲 Deploy pending |
-| Digest function | `send-daily-digest` (exists, needs rewrite) | 🔲 Rewrite pending |
-| MCP server | `open-brain-mcp` (not yet written) | 🔲 Phase 3 |
+| AI gateway | OpenRouter | ✅ Key set |
+| Capture function | `ingest-thought` | ✅ Deployed |
+| Digest function | `send-daily-digest` | ✅ Rewritten, cron active |
+| MCP server | `open-brain-mcp` | ✅ Deployed |
 | Reminders | pg_cron + `send-reminder` function | 🔲 Phase 4 |
 
 ---
