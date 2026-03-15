@@ -20,18 +20,15 @@ export default function Capture() {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      console.log('[Capture] Session check:', session ? 'authenticated' : 'no session');
       
       if (!session) {
         toast.error('Please sign in to capture');
         return;
       }
 
-      console.log('[Capture] Invoking ingest-thought with:', text.trim().substring(0, 50));
       const response = await supabase.functions.invoke('ingest-thought', {
         body: { text: text.trim() }
       });
-      console.log('[Capture] Response:', JSON.stringify(response.data), 'Error:', response.error);
 
       if (response.error) {
         throw new Error(response.error.message || 'Failed to capture');
@@ -45,7 +42,7 @@ export default function Capture() {
       toast.success(result.confirmation || 'Captured successfully!');
       setText('');
     } catch (error) {
-      console.error('[Capture] Error:', error);
+      console.error('Capture error:', error);
       toast.error('Failed to capture. Please try again.');
     } finally {
       setIsSubmitting(false);
